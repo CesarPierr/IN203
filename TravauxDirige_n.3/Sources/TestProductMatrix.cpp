@@ -66,7 +66,7 @@ bool verifProduct(const std::vector < double >&uA, std::vector < double >&vA,
 
 int main(int nargs, char *vargs[])
 {
-  int dim = 1024;
+  int dim = 1025;
   if (nargs > 1)
     dim = atoi(vargs[1]);
   std::vector < double >uA, vA, uB, vB;

@@ -2,7 +2,6 @@
 # define _MATRIX_HPP_
 
 # include <vector>
-
 class Matrix
 {
 public:
