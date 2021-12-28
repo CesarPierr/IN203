@@ -7,9 +7,14 @@
 #include "graphisme/src/SDL2/sdl2.hpp"
 #include <chrono>
 # include <mpi.h>
+#include <omp.h>
+
+#define NB_THREADS 2
+#define INDIV 100000
 
 void majStatistique( epidemie::Grille& grille, std::vector<epidemie::Individu> const& individus )
 {
+    #pragma omp parallel for num_threads(NB_THREADS)
     for ( auto& statistique : grille.getStatistiques() )
     {
         statistique.nombre_contaminant_grippe_et_contamine_par_agent = 0;
@@ -18,6 +23,7 @@ void majStatistique( epidemie::Grille& grille, std::vector<epidemie::Individu> c
     }
     auto [largeur,hauteur] = grille.dimension();
     auto& statistiques = grille.getStatistiques();
+    #pragma omp parallel for num_threads(NB_THREADS) schedule(dynamic,INDIV)
     for ( auto const& personne : individus )
     {
         auto pos = personne.position();
@@ -140,7 +146,7 @@ void simulation(bool affiche,int nargs, char* argv[])
             afficheSimulation(ecran, grille, jours_ecoules);
             end = std::chrono::system_clock::now();
             std::chrono::duration<double> elapsed_seconds_aff = end-start;
-            std::cout << "temps affichage : " << elapsed_seconds_aff.count() <<std::endl;
+            //std::cout << "temps affichage : " << elapsed_seconds_aff.count() <<std::endl;
             /*std::cout << jours_ecoules << "\t" << grille.nombreTotalContaminesGrippe() << "\t"
                     << grille.nombreTotalContaminesAgentPathogene() << std::endl;*/
 
@@ -150,6 +156,7 @@ void simulation(bool affiche,int nargs, char* argv[])
 
     if(rank == 1)
     {
+        float temps = 0;
         unsigned int graine_aleatoire = 1;
         std::uniform_real_distribution<double> porteur_pathogene(0.,1.);
 
@@ -173,7 +180,7 @@ void simulation(bool affiche,int nargs, char* argv[])
 
         int flag = 0;
         int jour_apparition_grippe = 0;
-        int nombre_immunises_grippe= (contexte.taux_population*23)/100;        
+        int nombre_immunises_grippe= (contexte.taux_population*23)/100;
 
         epidemie::Grippe grippe(0);
 
@@ -191,10 +198,13 @@ void simulation(bool affiche,int nargs, char* argv[])
                 jour_apparition_grippe = grippe.dateCalculImportationGrippe();
                 grippe.calculNouveauTauxTransmission();
                 // 23% des gens sont immunises. On prend les 23% premiers
+                #pragma omp parallel for num_threads(NB_THREADS) schedule(dynamic,INDIV)
+
                 for ( int ipersonne = 0; ipersonne < nombre_immunises_grippe; ++ipersonne)
                 {
                     population[ipersonne].devientImmuniseGrippe();
                 }
+                #pragma omp parallel for num_threads(NB_THREADS) schedule(dynamic,INDIV)
                 for ( int ipersonne = nombre_immunises_grippe; ipersonne < int(contexte.taux_population); ++ipersonne )
                 {
                     population[ipersonne].redevientSensibleGrippe();
@@ -202,6 +212,7 @@ void simulation(bool affiche,int nargs, char* argv[])
             }
             if (jours_ecoules%365 == std::size_t(jour_apparition_grippe))
             {
+                #pragma omp parallel for num_threads(NB_THREADS) schedule(dynamic,INDIV)
                 for (int ipersonne = nombre_immunises_grippe; ipersonne < nombre_immunises_grippe + 25; ++ipersonne )
                 {
                     population[ipersonne].estContamine(grippe);
@@ -211,6 +222,7 @@ void simulation(bool affiche,int nargs, char* argv[])
             majStatistique(grille, population);
             // On parcout la population pour voir qui est contamine et qui ne l'est pas, d'abord pour la grippe puis pour l'agent pathogene
             std::size_t compteur_grippe = 0, compteur_agent = 0, mouru = 0;
+            #pragma omp parallel for num_threads(NB_THREADS) schedule(dynamic,INDIV)
             for ( auto& personne : population )
             {
                 if (personne.testContaminationGrippe(grille, contexte.interactions, grippe, agent))
@@ -234,7 +246,8 @@ void simulation(bool affiche,int nargs, char* argv[])
                 personne.veillirDUnJour();
                 personne.seDeplace(grille);
             }
-            
+            end = std::chrono::system_clock::now();
+
             output << jours_ecoules << "\t" << grille.nombreTotalContaminesGrippe() << "\t"
                 << grille.nombreTotalContaminesAgentPathogene() << std::endl;
             
@@ -252,10 +265,10 @@ void simulation(bool affiche,int nargs, char* argv[])
                 MPI_Wait(&send_request1,&Stat); //obligatoire pour avoir un affichage coherent
                 flag = false;
             }
-            end = std::chrono::system_clock::now();
             std::chrono::duration<double> elapsed_seconds_calc = end-start;
-            std::cout << "temps calcul : " << elapsed_seconds_calc.count() <<std::endl;
+            temps += elapsed_seconds_calc.count();
         }
+        std::cout << "temps moyen execution : " << temps/jours_ecoules << std::endl;
         output.close();
 
         
