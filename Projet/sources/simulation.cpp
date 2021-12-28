@@ -90,7 +90,8 @@ void simulation(bool affiche,int nargs, char* argv[])
     MPI_Datatype stat_point;
     MPI_Type_contiguous(3,MPI_INT,&stat_point);
     MPI_Type_commit(&stat_point);
-
+    MPI_Request send_request_quit, rcv_request_quit,send_request1,send_request2;
+    //int flag = 0;
     //initialisation des variables selon le mode
     epidemie::ContexteGlobal contexte;
         // contexte.deplacement_maximal = 1; <= Si on veut moins de brassage
@@ -106,7 +107,51 @@ void simulation(bool affiche,int nargs, char* argv[])
 
     int quitting = 0;
     std::chrono::time_point<std::chrono::system_clock> start, end;
-    if(rank == 0)
+
+    if (rank == 0)
+    {
+        
+        sdl2::event_queue queue;
+        sdl2::window ecran("Simulation epidemie de grippe", {largeur_ecran,hauteur_ecran});
+        auto &rcv_buffer = grille.getStatistiques();
+        std::ofstream output("Courbe.dat");
+        output << "# jours_ecoules \t nombreTotalContaminesGrippe \t nombreTotalContaminesAgentPathogene()" << std::endl;
+        while (quitting == 0)
+        {
+            //#############################################################################################################
+            //##    Affichage des resultats pour le temps  actuel
+            //#############################################################################################################
+            start = std::chrono::system_clock::now();
+
+            auto events = queue.pull_events();
+            for ( const auto& e : events){
+                if (e->kind_of_event() == sdl2::event::quit)
+                {
+                    quitting = 1;
+                }
+            }
+
+            MPI_Isend(&quitting, 1, MPI_INT,1,100,globComm,&send_request_quit);
+            
+
+            MPI_Recv(rcv_buffer.data(), hauteur_grille*largeur_grille, stat_point,1,0,globComm,&Stat);
+            MPI_Recv(&jours_ecoules,1,MPI_INT,1,1,globComm,&Stat);
+            grille.Set_statistiques(rcv_buffer);
+            if (affiche) afficheSimulation(ecran, grille, jours_ecoules);
+            end = std::chrono::system_clock::now();
+            std::chrono::duration<double> elapsed_seconds_aff = end-start;
+            std::cout << "temps affichage : " << elapsed_seconds_aff.count() <<std::endl;
+            /*std::cout << jours_ecoules << "\t" << grille.nombreTotalContaminesGrippe() << "\t"
+                    << grille.nombreTotalContaminesAgentPathogene() << std::endl;*/
+
+            output << jours_ecoules << "\t" << grille.nombreTotalContaminesGrippe() << "\t"
+                << grille.nombreTotalContaminesAgentPathogene() << std::endl;
+            
+        }// Fin boucle temporelle
+        output.close();
+    }
+
+    if(rank == 1)
     {
         unsigned int graine_aleatoire = 1;
         std::uniform_real_distribution<double> porteur_pathogene(0.,1.);
@@ -129,14 +174,13 @@ void simulation(bool affiche,int nargs, char* argv[])
             }
         }
 
-        
-        int         jour_apparition_grippe = 0;
-        int         nombre_immunises_grippe= (contexte.taux_population*23)/100;        
+        int flag = 0;
+        int jour_apparition_grippe = 0;
+        int nombre_immunises_grippe= (contexte.taux_population*23)/100;        
 
         epidemie::Grippe grippe(0);
 
         std::cout << "Debut boucle epidemie" << std::endl << std::flush;
-
         while (quitting == 0)
         {
             start = std::chrono::system_clock::now();
@@ -193,57 +237,25 @@ void simulation(bool affiche,int nargs, char* argv[])
             }
             jours_ecoules += 1;
             auto &buffer = grille.getStatistiques();
-            MPI_Send(buffer.data(),largeur_grille*hauteur_grille,stat_point,1,0,globComm);
-            MPI_Recv(&quitting,1,MPI_INT,1,1,globComm,&Stat);
+
+
+            MPI_Iprobe( 0, 100, globComm, &flag, &Stat );
+
+            if (flag == 1)
+            {
+                MPI_Irecv(&quitting,1,MPI_INT,0,100,globComm,&rcv_request_quit);
+                MPI_Isend(buffer.data(),largeur_grille*hauteur_grille,stat_point,0,0,globComm, &send_request1);
+                MPI_Isend(&jours_ecoules,1,MPI_INT,0,1,globComm, &send_request2);
+
+                flag = false;
+            }
             end = std::chrono::system_clock::now();
             std::chrono::duration<double> elapsed_seconds_calc = end-start;
             std::cout << "temps calcul : " << elapsed_seconds_calc.count() <<std::endl;
-            std::cout << "quit ? " << quitting << std::endl;
         }
         
     }
 
-    if (rank == 1)
-    {
-        
-        sdl2::event_queue queue;
-
-        sdl2::window ecran("Simulation epidemie de grippe", {largeur_ecran,hauteur_ecran});
-        auto &rcv_buffer = grille.getStatistiques();
-        std::ofstream output("Courbe.dat");
-        output << "# jours_ecoules \t nombreTotalContaminesGrippe \t nombreTotalContaminesAgentPathogene()" << std::endl;
-        while (quitting == 0)
-        {
-            //TODO : envoyer les variables : grilles, jours_ecoulés
-            //#############################################################################################################
-            //##    Affichage des resultats pour le temps  actuel
-            //#############################################################################################################
-            auto events = queue.pull_events();
-            for ( const auto& e : events){
-                if (e->kind_of_event() == sdl2::event::quit)
-                {
-                    quitting = 1;
-                }
-            }
-            start = std::chrono::system_clock::now();
-            MPI_Recv(rcv_buffer.data(), hauteur_grille*largeur_grille, stat_point,0,0,globComm,&Stat);
-            MPI_Send(&quitting, 1, MPI_INT,0,1,globComm);
-            grille.Set_statistiques(rcv_buffer);
-            if (affiche) afficheSimulation(ecran, grille, jours_ecoules);
-            end = std::chrono::system_clock::now();
-            std::chrono::duration<double> elapsed_seconds_aff = end-start;
-            std::cout << "temps affichage : " << elapsed_seconds_aff.count() <<std::endl;
-            /*std::cout << jours_ecoules << "\t" << grille.nombreTotalContaminesGrippe() << "\t"
-                    << grille.nombreTotalContaminesAgentPathogene() << std::endl;*/
-
-            output << jours_ecoules << "\t" << grille.nombreTotalContaminesGrippe() << "\t"
-                << grille.nombreTotalContaminesAgentPathogene() << std::endl;
-            jours_ecoules += 1;
-            std::cout << "quit ? " << quitting << std::endl;
-            
-        }// Fin boucle temporelle
-        output.close();
-    }
     MPI_Finalize();
 }
 
