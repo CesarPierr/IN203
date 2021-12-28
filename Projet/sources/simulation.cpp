@@ -131,25 +131,17 @@ void simulation(bool affiche,int nargs, char* argv[])
 
         
         int         jour_apparition_grippe = 0;
-        int         nombre_immunises_grippe= (contexte.taux_population*23)/100;
-        sdl2::event_queue queue;
-        
+        int         nombre_immunises_grippe= (contexte.taux_population*23)/100;        
 
         epidemie::Grippe grippe(0);
 
         std::cout << "Debut boucle epidemie" << std::endl << std::flush;
-        auto events = queue.pull_events();
 
         while (quitting == 0)
         {
             start = std::chrono::system_clock::now();
-            for ( const auto& e : events)
-            {
-                if (e->kind_of_event() == sdl2::event::quit)
-                {
-                    quitting = 1;
-                }
-            }
+            
+            
             if (jours_ecoules%365 == 0)// Si le premier Octobre (debut de l'annee pour l'epidemie ;-) )
             {
                 grippe = epidemie::Grippe(jours_ecoules/365);
@@ -202,7 +194,7 @@ void simulation(bool affiche,int nargs, char* argv[])
             jours_ecoules += 1;
             auto &buffer = grille.getStatistiques();
             MPI_Send(buffer.data(),largeur_grille*hauteur_grille,stat_point,1,0,globComm);
-            MPI_Send(&quitting,1,MPI_INT,1,1,globComm);
+            MPI_Recv(&quitting,1,MPI_INT,1,1,globComm,&Stat);
             end = std::chrono::system_clock::now();
             std::chrono::duration<double> elapsed_seconds_calc = end-start;
             std::cout << "temps calcul : " << elapsed_seconds_calc.count() <<std::endl;
@@ -214,6 +206,8 @@ void simulation(bool affiche,int nargs, char* argv[])
     if (rank == 1)
     {
         
+        sdl2::event_queue queue;
+
         sdl2::window ecran("Simulation epidemie de grippe", {largeur_ecran,hauteur_ecran});
         auto &rcv_buffer = grille.getStatistiques();
         std::ofstream output("Courbe.dat");
@@ -224,9 +218,16 @@ void simulation(bool affiche,int nargs, char* argv[])
             //#############################################################################################################
             //##    Affichage des resultats pour le temps  actuel
             //#############################################################################################################
+            auto events = queue.pull_events();
+            for ( const auto& e : events){
+                if (e->kind_of_event() == sdl2::event::quit)
+                {
+                    quitting = 1;
+                }
+            }
             start = std::chrono::system_clock::now();
             MPI_Recv(rcv_buffer.data(), hauteur_grille*largeur_grille, stat_point,0,0,globComm,&Stat);
-            MPI_Recv(&quitting, 1, MPI_INT,0,1,globComm,&Stat);
+            MPI_Send(&quitting, 1, MPI_INT,0,1,globComm);
             grille.Set_statistiques(rcv_buffer);
             if (affiche) afficheSimulation(ecran, grille, jours_ecoules);
             end = std::chrono::system_clock::now();
@@ -243,6 +244,7 @@ void simulation(bool affiche,int nargs, char* argv[])
         }// Fin boucle temporelle
         output.close();
     }
+    MPI_Finalize();
 }
 
 int main(int argc, char* argv[])
