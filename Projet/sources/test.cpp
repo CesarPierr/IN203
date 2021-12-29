@@ -17,7 +17,7 @@ int main( int argc, char * argv[] )
     MPI_Request send_request_quit, rcv_request_quit,send_request1,send_request2;
     
 
-    struct {
+    class {
         Sensibilite sensibilite = Sensibilite::Sensible;
         int temps_incubation = 0;
         int temps_symptomatique = 0;

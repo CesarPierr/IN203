@@ -5,7 +5,6 @@
 #include "grippe.hpp"
 #include "agent_pathogene.hpp"
 #include "position.hpp"
-#include <boost/mpi.hpp>
 namespace epidemie 
 {
 class Individu 
@@ -81,19 +80,13 @@ private:
         int temps_passe_immunise = 0, temps_contagieux    = 0;
     } m_agent_pathogene;
     int m_age, m_esperance_de_vie;
-    Position m_position;
+    Position m_position;//struct int (x,y)
     std::default_random_engine         m_moteur_stochastique;
     std::uniform_int_distribution<int> m_generateur_quantite_deplacement;
     std::uniform_int_distribution<int> m_generateur_deplacement;
     std::uniform_real_distribution<double> m_generateur_maladie;
     std::uniform_int_distribution<int> m_generateur_age;
 
-    friend class boost::serialization::access;
-    template<typename archive>
-    void serialize(Archive &ar, const unsigned version)
-    {
-        ar & m_grippe & m_agent_pathogene & m_age & m_esperance_de_vie & m_position;
-    }
 
 };
 }
