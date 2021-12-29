@@ -5,7 +5,7 @@
 #include "grippe.hpp"
 #include "agent_pathogene.hpp"
 #include "position.hpp"
-
+#include <boost/mpi.hpp>
 namespace epidemie 
 {
 class Individu 
@@ -74,6 +74,7 @@ private:
         int temps_symptomatique = 0;
         int temps_contagieux = 0;
     } m_grippe;
+    
     struct {
         Sensibilite sensibilite = Sensibilite::Sensible;
         int temps_asymptomatique = 0, temps_symptomatique = 0;
@@ -86,6 +87,14 @@ private:
     std::uniform_int_distribution<int> m_generateur_deplacement;
     std::uniform_real_distribution<double> m_generateur_maladie;
     std::uniform_int_distribution<int> m_generateur_age;
+
+    friend class boost::serialization::access;
+    template<typename archive>
+    void serialize(Archive &ar, const unsigned version)
+    {
+        ar & m_grippe & m_agent_pathogene & m_age & m_esperance_de_vie & m_position;
+    }
+
 };
 }
 

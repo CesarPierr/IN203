@@ -1,40 +1,28 @@
 #include "mpi.h"
 #include <stdio.h>
- 
 int main( int argc, char * argv[] )
 {
+    MPI_Init(&nargs,&argv);
+    MPI_Comm globComm;
+    MPI_Comm_dup(MPI_COMM_WORLD, &globComm);
+    int nbp;
+    MPI_Comm_size(globComm, &nbp);
     int rank;
-    int sendMsg = 123;
-    int recvMsg = 0;
-    int flag = 0;
-    int count;
-    MPI_Status status;
-    MPI_Request request;
-    int errs = 0;
- 
-    MPI_Init( 0, 0 );
-    std::cout << "salut" << std::endl;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    if(rank == 0)
-    {
-        MPI_Isend( &sendMsg, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, &request );
-        while(!flag)
-        {
-            std::cout << "wesh" << std::endl;
-            MPI_Iprobe( 0, 0, MPI_COMM_WORLD, &flag, &status );
-        }
-        MPI_Get_count( &status, MPI_INT, &count );
-        if(count != 1)
-        {
-            errs++;
-        }
-        /*MPI_Recv( &recvMsg, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, &status );
-        if (recvMsg != 123)
-        {
-            errs++;
-        }*/
-        MPI_Wait( &request, &status );
-    }
+    MPI_Comm_rank(globComm, &rank);
+    MPI_Status Stat;
+    MPI_Datatype stat_point;
+    MPI_Type_contiguous(3,MPI_INT,&stat_point);
+    
+    MPI_Type_commit(&stat_point);
+    MPI_Request send_request_quit, rcv_request_quit,send_request1,send_request2;
+    
+
+    struct {
+        Sensibilite sensibilite = Sensibilite::Sensible;
+        int temps_incubation = 0;
+        int temps_symptomatique = 0;
+        int temps_contagieux = 0;
+    } m_grippe;
  
     MPI_Finalize();
     return errs;

@@ -8,16 +8,17 @@
 #include <chrono>
 # include <mpi.h>
 
-void majStatistique( epidemie::Grille& grille, std::vector<epidemie::Individu> const& individus )
+// envoyer largeur grille,statistiques,,individus
+
+void majStatistique( std::vector<StatistiqueParCase>& statistiques, std::vector<epidemie::Individu> const& individus,int largeur,int hauteur )
 {
-    for ( auto& statistique : grille.getStatistiques() )
+    
+    for ( auto& statistique : statistiques )
     {
         statistique.nombre_contaminant_grippe_et_contamine_par_agent = 0;
         statistique.nombre_contaminant_seulement_contamine_par_agent = 0;
         statistique.nombre_contaminant_seulement_grippe              = 0;
     }
-    auto [largeur,hauteur] = grille.dimension();
-    auto& statistiques = grille.getStatistiques();
     for ( auto const& personne : individus )
     {
         auto pos = personne.position();
@@ -47,7 +48,7 @@ void majStatistique( epidemie::Grille& grille, std::vector<epidemie::Individu> c
 void afficheSimulation(sdl2::window& ecran, epidemie::Grille const& grille, std::size_t jour)
 {
     auto [largeur_grille,hauteur_grille] = grille.dimension();
-    auto [largeur_ecran,hauteur_ecran] = ecran.dimensions();
+    auto [largeur_ecran,hauteur_ecran]   = ecran.dimensions();
     auto& statistiques = grille.getStatistiques();
     sdl2::font fonte_texte("./graphisme/src/data/Lato-Thin.ttf", 18);
     ecran.cls({0x00,0x00,0x00});
@@ -89,10 +90,16 @@ void simulation(bool affiche,int nargs, char* argv[])
     MPI_Status Stat;
     MPI_Datatype stat_point;
     MPI_Type_contiguous(3,MPI_INT,&stat_point);
+
     MPI_Type_commit(&stat_point);
     MPI_Request send_request_quit, rcv_request_quit,send_request1,send_request2;
     //int flag = 0;
     //initialisation des variables selon le mode
+    MPI_Comm subComm;
+    int colour = rank != 0?0:1;
+    MPI_Comm_split(globComm, colour, 0, &subComm);
+    auto [largeur,hauteur] = grille.dimension();
+
     epidemie::ContexteGlobal contexte;
         // contexte.deplacement_maximal = 1; <= Si on veut moins de brassage
         // contexte.taux_population = 400'000;
@@ -183,10 +190,12 @@ void simulation(bool affiche,int nargs, char* argv[])
 
         while (quitting == 0)
         {
-            start = std::chrono::system_clock::now();
             
+            start = std::chrono::system_clock::now();
+            //pas de parallelisation de cette partie car arrive 1/365 et pas tres long
             if (jours_ecoules%365 == 0)// Si le premier Octobre (debut de l'annee pour l'epidemie ;-) )
             {
+                
                 grippe = epidemie::Grippe(jours_ecoules/365);
                 jour_apparition_grippe = grippe.dateCalculImportationGrippe();
                 grippe.calculNouveauTauxTransmission();
@@ -200,6 +209,7 @@ void simulation(bool affiche,int nargs, char* argv[])
                     population[ipersonne].redevientSensibleGrippe();
                 }
             }
+            //pas de parallelisation de cette partie car arrive 1/365 et pas tres long
             if (jours_ecoules%365 == std::size_t(jour_apparition_grippe))
             {
                 for (int ipersonne = nombre_immunises_grippe; ipersonne < nombre_immunises_grippe + 25; ++ipersonne )
@@ -207,10 +217,12 @@ void simulation(bool affiche,int nargs, char* argv[])
                     population[ipersonne].estContamine(grippe);
                 }
             }
+
             // Mise a jour des statistiques pour les cases de la grille :
-            majStatistique(grille, population);
+            majStatistique(grille, population,largeur, hauteur);
             // On parcout la population pour voir qui est contamine et qui ne l'est pas, d'abord pour la grippe puis pour l'agent pathogene
             std::size_t compteur_grippe = 0, compteur_agent = 0, mouru = 0;
+
             for ( auto& personne : population )
             {
                 if (personne.testContaminationGrippe(grille, contexte.interactions, grippe, agent))
@@ -252,6 +264,7 @@ void simulation(bool affiche,int nargs, char* argv[])
                 MPI_Wait(&send_request1,&Stat); //obligatoire pour avoir un affichage coherent
                 flag = false;
             }
+            
             end = std::chrono::system_clock::now();
             std::chrono::duration<double> elapsed_seconds_calc = end-start;
             std::cout << "temps calcul : " << elapsed_seconds_calc.count() <<std::endl;
@@ -259,6 +272,11 @@ void simulation(bool affiche,int nargs, char* argv[])
         output.close();
 
         
+    }
+
+    if(rank > 1)
+    {
+
     }
 
     MPI_Finalize();
