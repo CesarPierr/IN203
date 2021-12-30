@@ -11,6 +11,7 @@
 
 void majStatistique(epidemie::Grille &grille, std::vector<epidemie::Individu> const &individus)
 {
+    #pragma omp parallel for num_threads(2)
     for (auto &statistique : grille.getStatistiques())
     {
         statistique.nombre_contaminant_grippe_et_contamine_par_agent = 0;
@@ -236,6 +237,7 @@ void simulation(bool affiche, int nargs, char *argv[])
             // On parcout la population pour voir qui est contamine et qui ne l'est pas, d'abord pour la grippe puis pour l'agent pathogene
             std::size_t compteur_grippe = 0, compteur_agent = 0, mouru = 0;
 #pragma omp parallel for num_threads(2)
+
             for (auto &personne : population)
             {
                 if (personne.testContaminationGrippe(grille, contexte.interactions, grippe, agent))
