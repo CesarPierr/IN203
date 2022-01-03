@@ -182,9 +182,7 @@ void simulation(bool affiche)
             personne.veillirDUnJour();
             personne.seDéplace(grille);
         }
-        end_simu = std::chrono::system_clock::now();
-        std::chrono::duration<double> elapsed_seconds_simu = end_simu-start_simu;
-        simulation_time += elapsed_seconds_simu.count();
+        
         //#############################################################################################################
         //##    Affichage des résultats pour le temps  actuel
         //#############################################################################################################
@@ -202,6 +200,9 @@ void simulation(bool affiche)
         jours_écoulés += 1;
         std::chrono::duration<double> elapsed_seconds_aff = end_aff-start_aff;
         affiche_time += elapsed_seconds_aff.count();
+        end_simu = std::chrono::system_clock::now();
+        std::chrono::duration<double> elapsed_seconds_simu = end_simu-start_simu;
+        simulation_time += elapsed_seconds_simu.count();
     }// Fin boucle temporelle
 
     std::cout << "temps moyen de simulation : " << simulation_time/(float)jours_écoulés << " s" << std::endl;
