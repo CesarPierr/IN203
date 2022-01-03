@@ -8,8 +8,8 @@
 #include <chrono>
 #include <mpi.h>
 #include <omp.h>
-#define NUM_THREADS 1
-
+#define NUM_THREADS 4
+#define POP 50000
 void majStatistique(epidemie::Grille &grille, std::vector<epidemie::Individu> const &individus)
 {
     #pragma omp parallel for num_threads(NUM_THREADS)
@@ -105,7 +105,7 @@ void simulation(bool affiche, int nargs, char *argv[])
 
     epidemie::ContexteGlobal contexte;
     // contexte.deplacement_maximal = 1; <= Si on veut moins de brassage
-    // contexte.taux_population = 400'000;
+    //contexte.taux_population = (nbp-1)*POP*NUM_THREADS;
     // contexte.taux_population = 1'000;
     contexte.interactions.beta = 60.;
     constexpr const unsigned int largeur_ecran = 1280, hauteur_ecran = 1024;
@@ -207,12 +207,12 @@ void simulation(bool affiche, int nargs, char *argv[])
                 jour_apparition_grippe = grippe.dateCalculImportationGrippe();
                 grippe.calculNouveauTauxTransmission();
 // 23% des gens sont immunises. On prend les 23% premiers
-#pragma omp parallel for num_threads(NUM_THREADS)
+#pragma omp parallel for num_threads(NUM_THREADS) //schedule(dynamic,POP)
                 for (int ipersonne = 0; ipersonne < nombre_immunises_grippe; ++ipersonne)
                 {
                     population[ipersonne].devientImmuniseGrippe();
                 }
-#pragma omp parallel for num_threads(NUM_THREADS)
+#pragma omp parallel for num_threads(NUM_THREADS) //schedule(dynamic,POP)
                 for (int ipersonne = nombre_immunises_grippe; ipersonne < int(pop_per_proc); ++ipersonne)
                 {
                     population[ipersonne].redevientSensibleGrippe();
@@ -221,7 +221,7 @@ void simulation(bool affiche, int nargs, char *argv[])
             int n_contaminations = rank == nbp ? 25 - (nbp - 1) * 25 / nbp : 25 / nbp;
             if (jours_ecoules % 365 == std::size_t(jour_apparition_grippe))
             {
-#pragma omp parallel for num_threads(NUM_THREADS)
+#pragma omp parallel for num_threads(NUM_THREADS) //schedule(dynamic,POP)
                 for (int ipersonne = nombre_immunises_grippe; ipersonne < nombre_immunises_grippe + n_contaminations; ++ipersonne)
                 {
                     population[ipersonne].estContamine(grippe);
@@ -237,7 +237,7 @@ void simulation(bool affiche, int nargs, char *argv[])
 
             // On parcout la population pour voir qui est contamine et qui ne l'est pas, d'abord pour la grippe puis pour l'agent pathogene
             std::size_t compteur_grippe = 0, compteur_agent = 0, mouru = 0;
-#pragma omp parallel for num_threads(NUM_THREADS)
+#pragma omp parallel for num_threads(NUM_THREADS) //schedule(dynamic,POP)
 
             for (auto &personne : population)
             {
