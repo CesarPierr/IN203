@@ -140,7 +140,7 @@ void simulation(bool affiche,int nargs, char* argv[])
             afficheSimulation(ecran, grille, jours_ecoules);
             end = std::chrono::system_clock::now();
             std::chrono::duration<double> elapsed_seconds_aff = end-start;
-            std::cout << "temps affichage : " << elapsed_seconds_aff.count() <<std::endl;
+            //std::cout << "temps affichage : " << elapsed_seconds_aff.count() <<std::endl;
             /*std::cout << jours_ecoules << "\t" << grille.nombreTotalContaminesGrippe() << "\t"
                     << grille.nombreTotalContaminesAgentPathogene() << std::endl;*/
 
@@ -180,7 +180,7 @@ void simulation(bool affiche,int nargs, char* argv[])
         std::cout << "Debut boucle epidemie" << std::endl << std::flush;
         std::ofstream output("Courbe.dat");
         output << "# jours_ecoules \t nombreTotalContaminesGrippe \t nombreTotalContaminesAgentPathogene()" << std::endl;
-
+        float temps = 0;
         while (quitting == 0)
         {
             start = std::chrono::system_clock::now();
@@ -254,8 +254,10 @@ void simulation(bool affiche,int nargs, char* argv[])
             }
             end = std::chrono::system_clock::now();
             std::chrono::duration<double> elapsed_seconds_calc = end-start;
-            std::cout << "temps calcul : " << elapsed_seconds_calc.count() <<std::endl;
+            temps += elapsed_seconds_calc.count();
+            
         }
+        std::cout << "temps calcul moyen : " << temps/jours_ecoules <<std::endl;
         output.close();
 
         
