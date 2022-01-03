@@ -2,6 +2,7 @@
 #include <random>
 #include <iostream>
 #include <fstream>
+#include <chrono>
 #include "contexte.hpp"
 #include "individu.hpp"
 #include "graphisme/src/SDL2/sdl2.hpp"
@@ -120,11 +121,12 @@ void simulation(bool affiche)
     output << "# jours_écoulés \t nombreTotalContaminésGrippe \t nombreTotalContaminésAgentPathogène()" << std::endl;
 
     épidémie::Grippe grippe(0);
-
-
+    std::chrono::time_point<std::chrono::system_clock> start_simu, end_simu,start_aff,end_aff;
+    float simulation_time = 0, affiche_time = 0;
     std::cout << "Début boucle épidémie" << std::endl << std::flush;
     while (!quitting)
     {
+        start_simu = std::chrono::system_clock::now();
         auto events = queue.pull_events();
         for ( const auto& e : events)
         {
@@ -180,9 +182,14 @@ void simulation(bool affiche)
             personne.veillirDUnJour();
             personne.seDéplace(grille);
         }
+        end_simu = std::chrono::system_clock::now();
+        std::chrono::duration<double> elapsed_seconds_simu = end_simu-start_simu;
+        simulation_time += elapsed_seconds_simu.count();
         //#############################################################################################################
         //##    Affichage des résultats pour le temps  actuel
         //#############################################################################################################
+        start_aff = std::chrono::system_clock::now();
+
         if (affiche) afficheSimulation(écran, grille, jours_écoulés);
 
         /*std::cout << jours_écoulés << "\t" << grille.nombreTotalContaminésGrippe() << "\t"
@@ -190,8 +197,16 @@ void simulation(bool affiche)
 
         output << jours_écoulés << "\t" << grille.nombreTotalContaminésGrippe() << "\t"
                << grille.nombreTotalContaminésAgentPathogène() << std::endl;
+        end_aff = std::chrono::system_clock::now();
+
         jours_écoulés += 1;
+        std::chrono::duration<double> elapsed_seconds_aff = end_aff-start_aff;
+        affiche_time += elapsed_seconds_aff.count();
     }// Fin boucle temporelle
+
+    std::cout << "temps moyen de simulation : " << simulation_time/(float)jours_écoulés << " s" << std::endl;
+    std::cout << "temps moyen de l'affichage : " << affiche_time/(float)jours_écoulés << " s" <<std::endl;
+
     output.close();
 }
 
