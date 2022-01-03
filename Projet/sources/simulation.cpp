@@ -106,7 +106,7 @@ void simulation(bool affiche,int nargs, char* argv[])
 
     int quitting = 0;
     std::chrono::time_point<std::chrono::system_clock> start, end;
-
+    float temps = 0;
     if (rank == 0)
     {
         
@@ -136,16 +136,17 @@ void simulation(bool affiche,int nargs, char* argv[])
             if (affiche) afficheSimulation(ecran, grille, jours_ecoules);
             end = std::chrono::system_clock::now();
             std::chrono::duration<double> elapsed_seconds_aff = end-start;
-            std::cout << "temps affichage : " << elapsed_seconds_aff.count() <<std::endl;
+            
             /*std::cout << jours_ecoules << "\t" << grille.nombreTotalContaminesGrippe() << "\t"
                     << grille.nombreTotalContaminesAgentPathogene() << std::endl;*/
 
             output << jours_ecoules << "\t" << grille.nombreTotalContaminesGrippe() << "\t"
                 << grille.nombreTotalContaminesAgentPathogene() << std::endl;
+            temps += elapsed_seconds_aff.count();
             jours_ecoules += 1;
-            std::cout << "quit ? " << quitting << std::endl;
             
         }// Fin boucle temporelle
+        std::cout << "temps affichage moyen : " << temps/jours_ecoules <<std::endl;
         output.close();
     }
 
@@ -241,9 +242,10 @@ void simulation(bool affiche,int nargs, char* argv[])
             MPI_Recv(&quitting,1,MPI_INT,0,1,globComm,&Stat);
             end = std::chrono::system_clock::now();
             std::chrono::duration<double> elapsed_seconds_calc = end-start;
-            std::cout << "temps calcul : " << elapsed_seconds_calc.count() <<std::endl;
-            std::cout << "quit ? " << quitting << std::endl;
+            temps += elapsed_seconds_calc.count();
+            
         }
+        std::cout << "temps calcul moyen : " << temps/jours_ecoules <<std::endl;
         
     }
 
