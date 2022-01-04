@@ -96,7 +96,7 @@ avec les parametres d'une parallelisation MPI maximale (3 processeurs pour la si
 
 # Conclusion
 
-On remarque que la parallelisation ayant le speedup maximal est celle utilisant 3 processus pour MPI et 3 threads par processus. Cela s'explique par le fait qu'on maximise l'utilisation de la mémoire partagée sans etre trop memory bound. De plus mon processeur n'ayant que 8 threads au maximum (4 coeurs) on comprend facilement que lorsque qu'on cherche à utiliser 3 processeurs et 4 threads par coeur soit 12 threads au total, le speedup ralentit fortement car la machine ne peut operer autant d'operations en parallèle.
+On remarque que la parallelisation ayant le speedup maximal est celle utilisant 3 processus pour MPI et 3 threads par processus. Cela s'explique par le fait qu'on maximise l'utilisation de la mémoire partagée sans etre trop memory bound. De plus mon processeur n'ayant que 8 coeurs au maximum (2 coeurs/socket) on comprend facilement que lorsque qu'on cherche à utiliser 3 processeurs et 4 threads par coeur soit 12 threads au total, le speedup ralentit fortement car la machine ne peut operer autant d'operations en parallèle.
 
   Ce projet m'a donc permis de me rendre compte de façon experimentale des limites théorique de la parallélisation vues en cours. J'ai aussi via mes recherches pour le projet découvert comment déclarer de nouveaux types MPI ainsi que de nouvelles fonctions.
   
