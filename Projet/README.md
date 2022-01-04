@@ -44,6 +44,8 @@ voici aussi quelques mesures complementaires utiles pour la suite :
 
 # Parallelisation avec affichage contre simulation
 
+Ici on transmet les données de la grille au processus qui affiche. J'ai donc transformé le programme initiale en le séparant en 2 boucles while pour la simulation et l'affichage. j'en profite aussi pour transmettre quand le processus doit quitter la boucle.
+
 | Temps passé :      | Avec affichage synchrone |
 | :--------------:   | :----------------------: |
 | Dans la simulation | 0.01775 s                | 
@@ -55,6 +57,8 @@ On remarque une nette diminution du temps de la simulation grace à la paralleli
 
 Le temps passé dans la simulation descend cette fois à 0.0156s soit 0.02 de moins qu'avec l'affichage synchrone. On est donc très proche du temps trouvé au debut sans affichage !
 
+L'astuce utilisée ici est de faire un Isend du quitting du processus d'affichage lorsqu'il est pret à recevoir les données ce qui active de Iprobe et lance le transfert. On fait un Wait ensuite pour ne pas que le buffer soit modifié occurant des problèmes d'affichage et de transmission.
+
 # Parallélisation OpenMP
 
 Pour la population constante par processus on compare donc au temps de la premiere simulation pour une population egale à nb_processus * population_par_processus
@@ -64,7 +68,11 @@ Pour la population constante par processus on compare donc au temps de la premie
 | population globale constante (100 000)     | 1.78           | 2.79           | 2.50          | 2.78          |
 | population constant par processus (100 000)| 1.88           | 2.87           | 2.46          | 2.55          |
 
+la seule chose à faire ici a été de paralleliser les boucles for de la boucle while. je n'ai apparemment pas rencontré de problème avec l'aléatoire.
+
 # Parallélisation MPI de la simulation
+
+Ici, il a fallut dans un premier temps repartir la population et le nombre de contaminés parmis les coeurs ainsi qu'incrementer la graine aléatoire. La parallelisation se fait ensuite par la transmission de la grille de chaqu'un des processus apres la majgrille et leur somme via un MPI_Allgather
 
 | Speedup (par rapport à la version initiale)| nb_proc_simu : 1 | nb_proc_simu : 2 |nb_proc_simu : 3 |
 | :----------------------------------------: | :--------------: | :--------------: | :-------------: |
@@ -76,6 +84,7 @@ Il faut néanmoins faire attention à la granularité
 
 # Parallélisation finale
 
+On rajoute à la derniere parallélisation les pragma omp parallel for dans la boucle while
 
 Sur mon ordinateur seulement :
 
