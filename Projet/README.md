@@ -1,5 +1,7 @@
 Les differents fichiers de simulation se trouvent dans des branches git differentes
 
+
+Ce projet est l'implementation de la parallelisation des calculs d'evolution epidemiologique d'un modèle de transmission de virus à l'aide d'Open MP et MPI
 # lscpu :
 
 Architecture:                    x86_64
