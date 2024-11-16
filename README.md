@@ -1,115 +1,90 @@
+# Parallélisation d'un Modèle de Transmission Virale
 
-Les differents fichiers de simulation se trouvent dans des branches git differentes
+## Vue d'ensemble
+Ce projet implémente la parallélisation des calculs d'évolution épidémiologique d'un modèle de transmission virale en utilisant OpenMP et MPI. Les différentes versions du code sont disponibles dans des branches Git distinctes.
 
+## Configuration matérielle de test
+Architecture testée : Intel(R) Core(TM) i5-1035G1 CPU @ 1.00GHz
+- 8 CPUs (4 cœurs physiques, 2 threads par cœur)
+- 1 socket
+- Cache L3 : 6 MiB
+- Fréquence : 1.00GHz - 3.60GHz
 
-Ce projet est l'implementation de la parallelisation des calculs d'evolution epidemiologique d'un modèle de transmission de virus à l'aide d'Open MP et MPI
-# lscpu :
+## Analyse des performances initiales
 
-Architecture:                    x86_64
-CPU op-mode(s):                  32-bit, 64-bit
-Byte Order:                      Little Endian
-Address sizes:                   39 bits physical, 48 bits virtual
-CPU(s):                          8
-On-line CPU(s) list:             0-7
-Thread(s) per core:              2
-Core(s) per socket:              4
-Socket(s):                       1
-NUMA node(s):                    1
-Vendor ID:                       GenuineIntel
-CPU family:                      6
-Model:                           126
-Model name:                      Intel(R) Core(TM) i5-1035G1 CPU @ 1.00GHz
-Stepping:                        5
-CPU MHz:                         1200.000
-CPU max MHz:                     3600,0000
-CPU min MHz:                     400,0000
-BogoMIPS:                        2380.80
-Virtualization:                  VT-x
-L1d cache:                       192 KiB
-L1i cache:                       128 KiB
-L2 cache:                        2 MiB
-L3 cache:                        6 MiB
-NUMA node0 CPU(s):               0-7
+### Mesures de base
+|                    | Avec affichage | Sans affichage |
+|-------------------|----------------|----------------|
+| Temps simulation  | 0.02881 s     | 0.01451 s     |
+| Temps affichage   | 0.01391 s     | 0.0001 s      |
 
-# Mesure de temps initiale :
-| Temps passé :      | Avec affichage | Sans affichage |
-| :--------------:   | :------------: | :------------: |
-| Dans la simulation | 0.02881 s      | 0.01451 s      |
-| Dans l'affichage   | 0.01391 s      |  0.0001 s      |
+### Impact de la taille de population
+| Habitants        | 100 000 | 200 000 | 300 000 | 400 000 |
+|-----------------|----------|----------|----------|----------|
+| Temps simulation| 0.02881 s| 0.05957 s| 0.08741 s| 0.1184 s |
 
-On remarque que le temps passé à l'affichage est presque aussi important que celui pour calculer et que ces 2 parties sont entierement parallelisables. On pourrait donc facilement gagner du temps en parallelisant ces 2 taches.
+## Stratégies de parallélisation
 
-voici aussi quelques mesures complementaires utiles pour la suite : 
+### 1. Parallélisation Simulation/Affichage
 
-| habitants :        | 100 000 habitants | 200 000 habitants | 300 000 habitants | 400 000 habitants |
-| :--------------:   | :---------------: | :--------------:  | :------------:    | :---------------: |
-| temps simulation   |  0.02881 s        | 0.05957 s         | 0.08741 s         | 0.1184 s          |
+#### Version synchrone
+- Séparation en deux boucles while distinctes
+- Transmission des données de la grille au processus d'affichage
+- Résultats :
+  - Simulation : 0.01775 s
+  - Affichage : 0.01726 s
 
-# Parallelisation avec affichage contre simulation
+#### Version asynchrone
+- Utilisation de `Isend` pour le processus d'affichage
+- Implémentation de `Iprobe` pour la transmission
+- Temps de simulation : 0.0156 s
 
-Ici on transmet les données de la grille au processus qui affiche. J'ai donc transformé le programme initiale en le séparant en 2 boucles while pour la simulation et l'affichage. j'en profite aussi pour transmettre quand le processus doit quitter la boucle.
+### 2. Parallélisation OpenMP
+Performance relative (speedup) par rapport à la version initiale :
 
-| Temps passé :      | Avec affichage synchrone |
-| :--------------:   | :----------------------: |
-| Dans la simulation | 0.01775 s                | 
-| Dans l'affichage   | 0.01726 s                | 
+| Configuration                          | 1 thread | 2 threads | 3 threads | 4 threads |
+|---------------------------------------|----------|-----------|-----------|-----------|
+| Population globale fixe (100 000)     | 1.78     | 2.79      | 2.50      | 2.78      |
+| Population fixe par processus (100 000)| 1.88     | 2.87      | 2.46      | 2.55      |
 
-On remarque une nette diminution du temps de la simulation grace à la parallelisation de l'affichage, néanmoins celle-ci reste 0.03s plus lent que la simulation sans affichage surement du au temps de synchronisation et d'envoi des données
+### 3. Parallélisation MPI
+- Répartition de la population entre les cœurs
+- Distribution des contaminés
+- Utilisation de `MPI_Allgather` pour la synchronisation
 
-# Parallélisation affichage asynchrone contre simulation 
+| Configuration                          | 1 proc | 2 proc | 3 proc |
+|---------------------------------------|---------|---------|---------|
+| Population globale fixe (100 000)     | 1.73    | 2.66    | 2.94    |
+| Population fixe par processus (100 000)| 1.75    | 2.79    | 3.73    |
 
-Le temps passé dans la simulation descend cette fois à 0.0156s soit 0.02 de moins qu'avec l'affichage synchrone. On est donc très proche du temps trouvé au debut sans affichage !
+### 4. Parallélisation hybride (OpenMP + MPI)
 
-L'astuce utilisée ici est de faire un Isend du quitting du processus d'affichage lorsqu'il est pret à recevoir les données ce qui active de Iprobe et lance le transfert. On fait un Wait ensuite pour ne pas que le buffer soit modifié occurant des problèmes d'affichage et de transmission.
+#### Configuration minimale (2 processus MPI)
+| Configuration                        | 1 thread/proc | 2 threads/proc | 3 threads/proc | 4 threads/proc |
+|-------------------------------------|---------------|----------------|----------------|----------------|
+| Population globale fixe (100 000)    | 2.75         | 3.78          | 4.89          | 1.20          |
+| Population fixe par thread (50 000)  | 2.73         | 3.58          | 4.01          | 2.42          |
 
-# Parallélisation OpenMP
+#### Configuration maximale (3 processus MPI)
+| Configuration                        | 1 thread/proc | 2 threads/proc | 3 threads/proc | 4 threads/proc |
+|-------------------------------------|---------------|----------------|----------------|----------------|
+| Population globale fixe (100 000)    | 2.88         | 3.54          | 0.97          | 0.43          |
+| Population fixe par thread (33 333)  | 2.88         | 3.65          | 1.94          | 1.38          |
 
-Pour la population constante par processus on compare donc au temps de la premiere simulation pour une population egale à nb_processus * population_par_processus
+## Conclusions
 
-| Speedup (par rapport à la version initiale)| nb_threads : 1 | nb_threads : 2 |nb_threads : 3 |nb_threads : 4 |
-| :----------------------------------------: | :------------: | :------------: | :-----------: | :-----------: |
-| population globale constante (100 000)     | 1.78           | 2.79           | 2.50          | 2.78          |
-| population constant par processus (100 000)| 1.88           | 2.87           | 2.46          | 2.55          |
+### Performance optimale
+La meilleure configuration obtenue utilise :
+- 3 processus MPI
+- 3 threads par processus
+- Speedup maximal observé : 4.89
 
-la seule chose à faire ici a été de paralleliser les boucles for de la boucle while. je n'ai apparemment pas rencontré de problème avec l'aléatoire.
+### Limites observées
+1. Memory bound : La parallélisation OpenMP montre ses limites avec l'augmentation du nombre de threads
+2. Ressources matérielles : Les performances se dégradent au-delà de 8 threads (limite physique du CPU)
 
-# Parallélisation MPI de la simulation
-
-Ici, il a fallut dans un premier temps repartir la population et le nombre de contaminés parmis les coeurs ainsi qu'incrementer la graine aléatoire. La parallelisation se fait ensuite par la transmission de la grille de chaqu'un des processus apres la majgrille et leur somme via un MPI_Allgather
-
-| Speedup (par rapport à la version initiale)| nb_proc_simu : 1 | nb_proc_simu : 2 |nb_proc_simu : 3 |
-| :----------------------------------------: | :--------------: | :--------------: | :-------------: |
-| population globale constante (100 000)     | 1.73             | 2.66             | 2.94            |
-| population constant par processus (100 000)| 1.75             | 2.79             | 3.73            |
-
-On remarque ici que le speedup continue a augmenter sensiblement et ne stagne pas pour une population constante par processus. La parallelisation précédente etait donc memoy bound lorsqu'on utilisait un trop grand nombre de threads.
-Il faut néanmoins faire attention à la granularité
-
-# Parallélisation finale
-
-On rajoute à la derniere parallélisation les pragma omp parallel for dans la boucle while
-
-Sur mon ordinateur seulement :
-
-avec les parametres d'une parallelisation MPI minimale (2 processeurs pour la simulation) 
-
-| Speedup (par rapport à la version initiale)| nb_threads/proc : 1 | nb_threads/proc : 2 |nb_threads/proc : 3 | nb_threads/proc : 4 |
-| :----------------------------------------: | :-----------------: | :-----------------: | :----------------: | :-----------------: |
-| population globale constante (100 000)     | 2.75                | 3.78                | 4.89               | 1.20                |
-| population constant par threads (50 000)   | 2.73                | 3.58                | 4.01               | 2.42                |
-
-avec les parametres d'une parallelisation MPI maximale (3 processeurs pour la simulation) 
-
-| Speedup (par rapport à la version initiale)| nb_threads/proc : 1 | nb_threads/proc : 2 |nb_threads/proc : 3 | nb_threads/proc : 4 |
-| :----------------------------------------: | :-----------------: | :-----------------: | :----------------: | :-----------------: |
-| population globale constante (100 000)     | 2.88                | 3.54                | 0.97               | 0.43                |
-| population constant par threads (33 333)   | 2.88                | 3.65                | 1.94               | 1.38                |
-
-
-# Conclusion
-
-On remarque que la parallelisation ayant le speedup maximal est celle utilisant 3 processus pour MPI et 3 threads par processus. Cela s'explique par le fait qu'on maximise l'utilisation de la mémoire partagée sans etre trop memory bound. De plus mon processeur n'ayant que 8 coeurs au maximum (2 coeurs/socket) on comprend facilement que lorsque qu'on cherche à utiliser 3 processeurs et 4 threads par coeur soit 12 threads au total, le speedup ralentit fortement car la machine ne peut operer autant d'operations en parallèle.
-
-  Ce projet m'a donc permis de me rendre compte de façon experimentale des limites théorique de la parallélisation vues en cours. J'ai aussi via mes recherches pour le projet découvert comment déclarer de nouveaux types MPI ainsi que de nouvelles fonctions.
-  
-  J'ai aussi partiellement découvert la librairie boost car je n'avais pas compris dans un premier temps qu'il ne fallait pas envoyer la population dans la derniere partie et j'ai été amené à me demander (pour rien) comment envoyer une classe par MPI en la serializant avec boost
+### Apprentissages techniques
+- Création de nouveaux types MPI
+- Gestion de la mémoire partagée
+- Optimisation des communications inter-processus
+- Exploration partielle de la sérialisation avec Boost (non utilisée dans la version finale)
